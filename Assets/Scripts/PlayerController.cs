@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Runtime.InteropServices;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 public class PlayerController : MonoBehaviour
 {
@@ -16,6 +18,14 @@ public class PlayerController : MonoBehaviour
 
     private Rigidbody2D playerbody;
 
+    // Player Renderer
+    public SpriteRenderer body_renderer, eyes_renderer;
+    public Sprite[] eyes_list;
+    public Color[] body_colors, eyes_colors;
+
+    // Screen
+    public Volume rage_postprocessing;
+
     // Weapons
     public GameObject sword;
     public BoxCollider2D swordCollider;
@@ -27,6 +37,9 @@ public class PlayerController : MonoBehaviour
 
     // UI
     public Text health_indicator;
+    public Sprite fullheart, halfheart;
+    public Grid heartgrid;
+    private List<Image> hearts;
 
     // System
     [DllImport("user32.dll", CharSet = CharSet.Auto, ExactSpelling = true, CallingConvention = CallingConvention.Winapi)] private static extern short GetKeyState(int keyCode);
@@ -46,9 +59,29 @@ public class PlayerController : MonoBehaviour
 
         playerbody = GetComponent<Rigidbody2D>();
 
+        // player renderer
+        body_renderer.color = body_colors[0];
+        eyes_renderer.sprite = eyes_list[0];
+        eyes_renderer.color = eyes_colors[0];
+
+        // screen
+        rage_postprocessing.weight = 0;
+
         // timers
         health_timer = 0;
         sword_timer = max_sword_timer_value;
+
+        // ui
+        hearts = new List<Image>();
+        for(int i = 0; i < maxHealth / 2; i++)
+        {
+            GameObject obj = new GameObject();
+            Image newHeart = obj.AddComponent<Image>();
+            newHeart.sprite = fullheart;
+            hearts.Add(newHeart);
+
+            obj.transform.parent = heartgrid.gameObject.transform;
+        }
 
         // system
         if (((ushort)GetKeyState(0x90) & 0xffff) != 1)
@@ -72,7 +105,28 @@ public class PlayerController : MonoBehaviour
         speed = maxSpeed - (speedDiff * health_ratio);
         acceleration = maxAcc - (accDiff * health_ratio);
 
-        health_indicator.text = "Health: " + health + "/" + maxHealth + "\nSword: " + (float)((int)((max_sword_timer_value - sword_timer) * 100) / 100f);
+        for(int i = 1; i <= maxHealth; i+=2)
+        {
+            if(i <= health)
+            {
+                hearts[((i+1) / 2) - 1].gameObject.SetActive(true);
+                hearts[((i+1) / 2) - 1].sprite = i+1 <= health ? fullheart : halfheart;
+            }
+            else
+            {
+                hearts[((i + 1) / 2) - 1].gameObject.SetActive(false);
+            }
+        }
+        //health_indicator.text = "Health: " + health + "/" + maxHealth + "\nSword: " + (float)((int)((max_sword_timer_value - sword_timer) * 100) / 100f);
+        health_indicator.text = "";
+
+        // visual effects
+        body_renderer.color = Color.Lerp(body_colors[0], body_colors[1], 1 - health_ratio);
+        int eyes_index = (eyes_list.Length - 1) - (int)(health_ratio * (eyes_list.Length - 1));
+        eyes_renderer.sprite = eyes_list[eyes_index];
+        eyes_renderer.color = Color.Lerp(eyes_colors[0], eyes_colors[1], 1 - health_ratio);
+
+        rage_postprocessing.weight = 1 - health_ratio;
 
         // attacks
         RotateWeapon();
@@ -123,9 +177,8 @@ public class PlayerController : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collider)
     {
-        if(collider.tag == "Enemy" && health_timer <= 0)
+        if(collider.tag == "Enemy" && health_timer <= 0 && !swordCollider.enabled)
         {
-            Debug.Log("hit!");
             health -= health > 0 ? 1 : 0;
             health_timer = 1;
         }
