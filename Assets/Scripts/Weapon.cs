@@ -6,7 +6,7 @@ public class Weapon : MonoBehaviour
 {
     public float damage;
 
-    void incrementDamage(float d)
+    public void incrementDamage(float d)
     {
         damage += d;
     }

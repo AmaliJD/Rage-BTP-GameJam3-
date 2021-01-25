@@ -17,6 +17,7 @@ public class PlayerController : MonoBehaviour
     private float minSpeed = 1.6f/*0.05f*/, maxSpeed = 7f/*.2f*/, speedDiff;
 
     private Rigidbody2D playerbody;
+    public Transform enemyholder;
 
     // Player Renderer
     public SpriteRenderer body_renderer, eyes_renderer;
@@ -31,15 +32,20 @@ public class PlayerController : MonoBehaviour
     public BoxCollider2D swordCollider;
     public Animator swordAnim;
     public TrailRenderer swordtrail;
+    private Weapon weapon;
 
     // timers
-    private float health_timer = 0, sword_timer, max_sword_timer_value = 5;
+    private float health_timer = 0, sword_timer, max_sword_timer_value;
+    private const float MAXSWORDTIMERVALUE = 5;
+    private float timer = 0;
+    private int milli = 0, m = 0, sec = 0, s = 0, min = 0;
 
     // UI
-    public Text health_indicator;
+    public Text time_text;
     public Sprite fullheart, halfheart;
     public Grid heartgrid;
     private List<Image> hearts;
+    public Slider sword_timer_slider;
 
     // System
     [DllImport("user32.dll", CharSet = CharSet.Auto, ExactSpelling = true, CallingConvention = CallingConvention.Winapi)] private static extern short GetKeyState(int keyCode);
@@ -67,8 +73,12 @@ public class PlayerController : MonoBehaviour
         // screen
         rage_postprocessing.weight = 0;
 
+        // weapons
+        weapon = swordCollider.gameObject.GetComponent<Weapon>();
+
         // timers
         health_timer = 0;
+        max_sword_timer_value = MAXSWORDTIMERVALUE;
         sword_timer = max_sword_timer_value;
 
         // ui
@@ -82,6 +92,9 @@ public class PlayerController : MonoBehaviour
 
             obj.transform.parent = heartgrid.gameObject.transform;
         }
+
+        sword_timer_slider.maxValue = max_sword_timer_value;
+        sword_timer_slider.value = sword_timer;
 
         // system
         if (((ushort)GetKeyState(0x90) & 0xffff) != 1)
@@ -98,6 +111,7 @@ public class PlayerController : MonoBehaviour
         moveY = Mathf.Lerp(moveY, Input.GetAxisRaw("Vertical") * speed, acceleration);
 
         //transform.Translate(new Vector3(moveX, moveY, 0));
+        //if (swordCollider.enabled) { moveX = moveY = 0; }
         playerbody.velocity = new Vector3(moveX, moveY, 0);
 
         // health effects
@@ -118,7 +132,6 @@ public class PlayerController : MonoBehaviour
             }
         }
         //health_indicator.text = "Health: " + health + "/" + maxHealth + "\nSword: " + (float)((int)((max_sword_timer_value - sword_timer) * 100) / 100f);
-        health_indicator.text = "";
 
         // visual effects
         body_renderer.color = Color.Lerp(body_colors[0], body_colors[1], 1 - health_ratio);
@@ -132,14 +145,15 @@ public class PlayerController : MonoBehaviour
         RotateWeapon();
         if (Input.GetMouseButtonDown(0) && sword_timer >= max_sword_timer_value)
         {
-            max_sword_timer_value = max_sword_timer_value * health_ratio;
+            max_sword_timer_value = (MAXSWORDTIMERVALUE * health_ratio)+.001f;
+            Debug.Log(max_sword_timer_value);
             sword_timer = 0;
             swordtrail.Clear();
             swordtrail.emitting = false;
             swordAnim.Play("SwordSwipe");
         }
 
-        // timer
+        // internal timers
         //health_timer += Time.deltaTime;
         //if(health_timer > 5) { health -= health == 0 ? 0 : 1; health_timer = 0; }
         if (health_timer > 0)
@@ -151,6 +165,23 @@ public class PlayerController : MonoBehaviour
         {
             sword_timer += Time.deltaTime;
         }
+
+        // ui
+        sword_timer_slider.maxValue = max_sword_timer_value;
+        sword_timer_slider.value = sword_timer;
+
+        milli = (int)(timer * 1000) % 1000;
+        sec = (int)(timer);
+        min = (int)(sec / 60);
+
+        milli -= (1000 * m);
+        sec -= (60 * s);
+
+        if (milli == 1000) { m++; };
+        if (sec == 60) { s++; };
+
+        time_text.text = min + ":" + (sec < 10 ? "0" : "") + sec + ": Time";
+        if (enemyholder.childCount > 0) { timer += Time.deltaTime; }
     }
 
     void RotateWeapon()
@@ -175,12 +206,14 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void OnTriggerEnter2D(Collider2D collider)
+    private void OnTriggerStay2D(Collider2D collider)
     {
         if(collider.tag == "Enemy" && health_timer <= 0 && !swordCollider.enabled)
         {
             health -= health > 0 ? 1 : 0;
-            health_timer = 1;
+            health_timer = .5f;
+
+            weapon.incrementDamage(.3f);
         }
     }
 }
