@@ -20,4 +20,12 @@ public class DontDestroy : MonoBehaviour
             DontDestroyOnLoad(gameObject);
         }
     }
+
+    private void OnLevelWasLoaded(int level)
+    {
+        if (GlobalData.Index == 0)
+        {
+            Destroy(gameObject);
+        }
+    }
 }

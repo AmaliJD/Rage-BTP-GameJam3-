@@ -4,8 +4,9 @@ using UnityEngine;
 
 public static class GlobalData
 {
-    private static string[] scenes = new string[] { "Level 5", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5" };
+    private static string[] scenes = new string[] { "Main Menu", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5", "Level 6", "Level 7", "Level 8", "Level 9", "Level 10", "Level 11", "Level 12" };
     private static int level_index = 1;
+    private static int[] stars = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     public static string[] Scene
     {
         get
@@ -27,6 +28,18 @@ public static class GlobalData
         set
         {
             level_index = value;
+        }
+    }
+
+    public static int[] Stars
+    {
+        get
+        {
+            return stars;
+        }
+        set
+        {
+            stars = value;
         }
     }
 }

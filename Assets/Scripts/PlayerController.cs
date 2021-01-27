@@ -89,17 +89,31 @@ public class PlayerController : MonoBehaviour
     public GameObject heartattack_ui;
     public GameObject[] stars;
 
+    public Button Retry_Button;
+    public Button Quit_Button;
+
     // System
     [DllImport("user32.dll", CharSet = CharSet.Auto, ExactSpelling = true, CallingConvention = CallingConvention.Winapi)] private static extern short GetKeyState(int keyCode);
     [DllImport("user32.dll")] private static extern int GetKeyboardState(byte[] lpKeyState);
     [DllImport("user32.dll", EntryPoint = "keybd_event")] private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
     private const byte VK_NUMLOCK = 0x90; private const uint KEYEVENTF_EXTENDEDKEY = 1; private const int KEYEVENTF_KEYUP = 0x2; private const int KEYEVENTF_KEYDOWN = 0x0;
 
+    private void Awake()
+    {
+        Retry_Button.onClick.AddListener(() => { Retry(); });
+        Quit_Button.onClick.AddListener(() => { Quit(); });
+    }
+
     private void Start()
     {
         // game
         level_number_text.text = ""+level_number;
 
+        if(level_number == 12)
+        {
+            minSpeed = 1.8f;
+            maxSpeed = 9f;
+        }
         // player
         speed = minSpeed;
         acceleration = minAcc;
@@ -198,10 +212,10 @@ public class PlayerController : MonoBehaviour
 
             // attacks
             RotateWeapon();
-            /*if (health == 0) { */max_sword_timer_value = (MAXSWORDTIMERVALUE * health_ratio) + .001f;// }
+            /*if (health == 0) { */max_sword_timer_value = (MAXSWORDTIMERVALUE * health_ratio) + .00001f;// }
             if (Input.GetMouseButtonDown(0) && sword_timer >= max_sword_timer_value)
             {
-                max_sword_timer_value = (MAXSWORDTIMERVALUE * health_ratio) + .001f;
+                max_sword_timer_value = (MAXSWORDTIMERVALUE * health_ratio) + .00001f;
                 sword_timer = 0;
                 swordtrail.Clear();
                 swordtrail.emitting = false;
@@ -216,6 +230,8 @@ public class PlayerController : MonoBehaviour
                 health_timer -= Time.deltaTime;
             }
 
+            healing_timer += Time.deltaTime;
+
             if (sword_timer < max_sword_timer_value)
             {
                 sword_timer += Time.deltaTime;
@@ -229,9 +245,9 @@ public class PlayerController : MonoBehaviour
                 explode.PlayOneShot(explode.clip, 1);
                 explosion.Play();
                 swordCollider.enabled = false;
+                swordAnim.Play("SwordIdle");
                 body_renderer.enabled = false;
                 eyes_renderer.enabled = false;
-
                 StartCoroutine(Restart());
             }
         }
@@ -330,8 +346,9 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        //SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         Time.timeScale = 1.0f;
+        UIAnimator.SetTrigger("Retry");
     }
 
     IEnumerator NextLevel()
@@ -353,12 +370,15 @@ public class PlayerController : MonoBehaviour
             time += Time.deltaTime;
             yield return null;
         }
+
+        int numstars = 0;
         for(int i = timeawards.Length - 1; i >= 0; i--)
         {
             if(timer < timeawards[i])
             {
                 starsfx.PlayOneShot(starsfx.clip, 1);
                 stars[i].SetActive(true);
+                numstars++;
 
                 time = 0;
                 while (time < .3f)
@@ -375,7 +395,7 @@ public class PlayerController : MonoBehaviour
         }
 
         level_number += 1;
-        level_number_text.text = ""+level_number;
+        level_number_text.text = "" + (level_number != 13 ? ""+level_number : "WIN");
         UIAnimator.SetTrigger("End");
 
         time = 0;
@@ -385,11 +405,50 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
+        GlobalData.Stars[GlobalData.Index] = Mathf.Max(GlobalData.Stars[GlobalData.Index], numstars);
         GlobalData.Index = (GlobalData.Index + 1 == GlobalData.Scene.Length) ? 0 : GlobalData.Index + 1;
         SceneManager.LoadScene(GlobalData.Scene[GlobalData.Index]);
         
     }
-    
+
+    public void Retry()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        Time.timeScale = 1.0f;
+    }
+
+    public void Quit()
+    {
+        Time.timeScale = 1.0f;
+        GlobalData.Index = 0;
+        SceneManager.LoadScene(GlobalData.Scene[GlobalData.Index]);
+    }
+
+    public void TakeDamage()
+    {
+        if (health_timer <= 0 && !swordCollider.enabled)
+        {
+            int damage = health > 0 ? 1 : 0;
+            health -= damage;
+            health_timer = .4f;
+
+            if (damage != 0)
+            {
+                weapon.incrementDamage(.5f * damage);
+                if (health == 0)
+                {
+                    hurt.PlayOneShot(hurt.clip, 1);
+                    powerup.PlayOneShot(powerup.clip, 1);
+                    flames.Play();
+                }
+                else
+                {
+                    hurt.PlayOneShot(hurt.clip, 1);
+                }
+            }
+        }
+    }
+
     private void OnTriggerStay2D(Collider2D collider)
     {
         if(collider.tag == "Enemy" && health_timer <= 0 && !swordCollider.enabled)
@@ -413,16 +472,23 @@ public class PlayerController : MonoBehaviour
                 }
             }
         }
-        else if (collider.tag == "Healing")
+    }
+
+    float healing_timer = .1f;
+    private void OnTriggerEnter2D(Collider2D collider)
+    {
+        if (collider.tag == "Healing" && healing_timer > .1f)
         {
             int life = health < maxHealth ? collider.GetComponent<HeartContainer>().health : 0;
+
             health += life;
             health = Mathf.Min(health, maxHealth);
-            health_timer = 0;
+            health_timer = .6f;
             flames.Stop();
 
             if (life != 0)
             {
+                healing_timer = 0;
                 heartattack_ui.SetActive(false);
                 weapon.incrementDamage(-.5f * life);
                 lifeup.PlayOneShot(lifeup.clip, 1);
